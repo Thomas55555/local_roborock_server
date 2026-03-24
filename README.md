@@ -1,6 +1,7 @@
 # Roborock Local Server
 
 If this project helps, you can support it or next time you buy a Roborock device, come back here and use my affiliate links!
+
 [![Buy Me a Coffee][badge-bmac]][link-bmac]
 [![PayPal][badge-paypal]][link-paypal]
 [![Roborock 5 Off][badge-roborock-discount]][link-roborock-discount]
@@ -9,36 +10,9 @@ If this project helps, you can support it or next time you buy a Roborock device
 
 Roborock Local Server is a private Roborock HTTPS and MQTT stack you run on your own system.
 
-It gives you:
-
-- one Docker container
-- one admin UI
-- one `config.toml`
-- embedded Mosquitto or an external MQTT broker
-- automatic wildcard certificate renewal through Cloudflare DNS-01
-- cloud import for homes, rooms, devices, shared devices, scenes, and schedules
-
 This service is meant to stay private. Point your own DNS at your server's LAN IP and do **NOT** expose it directly to the public internet. In its current state it does not handle internet exposure safely enough. For now, keep it on your LAN only. In the future, I plan to reuse Roborock's auth natively which should make everything secure enough.
 
-## Runtime/Adapter Split
-
-This repository now supports a core runtime mode and a standalone adapter mode:
-
-- standalone adapter mode (default): includes `/admin` dashboard + admin APIs
-- core runtime mode: protocol runtime only, no `/admin` standalone dashboard routes
-- `/ui/api/health` and `/ui/api/vacuums` stay available in both modes for automation/adapter consumers
-
-Run core runtime mode with:
-
-```bash
-uv run roborock-local-server serve --config config.toml --core-only
-```
-
-The Home Assistant add-on wrapper lives in the sibling repository:
-
-- `../roborock_local_server_ha_addon`
-
-It vendors this runtime package and starts it with `--core-only`.
+This project is in VERY EARLY BETA!!! Do not use this repository unless you are sure you know what you are doing and are rather technical.
 
 ## Requirements
 
@@ -46,7 +20,6 @@ It vendors this runtime package and starts it with `--core-only`.
 - `uv`
 - a Linux server or Linux VM on your LAN
 - a domain you control
-- private DNS for that domain or subdomain
 - a Cloudflare API token with DNS edit access for the zone
 
 ## Create the Cloudflare Token
@@ -66,11 +39,11 @@ For this project, keep the token limited to the single zone you are using. Do no
 
 ## How It Works
 
-Pick one hostname, for example `roborock.example.com`.
+Pick one hostname under your domain, for example `roborock.example.com`.
 
 - `stack_fqdn` is the hostname the app, vacuums, and admin UI will use.
 - `base_domain` is the zone used for the wildcard certificate, for example `example.com`.
-- Your private DNS should point `stack_fqdn` at your server's LAN IP.
+- Your network's DNS should point `stack_fqdn` at your server's LAN IP.
 - Cloudflare is only used for DNS-01 certificate issuance. It does not need to proxy traffic to your server.
 
 The vacuum needs to be able to hit your server on ports 443/tcp and 8883/tcp.

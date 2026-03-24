@@ -1,0 +1,40 @@
+[project]
+name = "roborock-local-server"
+version = "0.1.0"
+description = "Clean release surface for a private local Roborock server stack."
+requires-python = ">=3.11,<4"
+readme = "README.md"
+authors = [{ name = "Codex" }]
+dependencies = [
+  "aiohttp>=3.9,<4",
+  "cryptography>=42,<47",
+  "fastapi>=0.115,<1",
+  "gmpy2>=2.3,<3",
+  "pycryptodome>=3.20,<4",
+  "python-roborock==4.20.0",
+  "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27,<1",
+  "pytest>=8,<9",
+]
+mitm = [
+  "mitmproxy>=11,<13",
+  "qrcode>=8,<9",
+]
+
+[project.scripts]
+roborock-local-server = "roborock_local_server.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/roborock_local_server"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"

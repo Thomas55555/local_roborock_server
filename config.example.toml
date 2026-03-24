@@ -1,0 +1,33 @@
+[network]
+# The one hostname the stack will serve.
+stack_fqdn = "roborock.example.com"
+bind_host = "0.0.0.0"
+https_port = 443
+mqtt_tls_port = 8883
+region = "us"
+
+[broker]
+# Set mode = "external" and host/port to your broker if you do not want embedded Mosquitto.
+mode = "embedded"
+host = "127.0.0.1"
+port = 18830
+mosquitto_binary = "mosquitto"
+enable_topic_bridge = true
+
+[storage]
+data_dir = "/data"
+
+[tls]
+# Cloudflare DNS-01 wildcard issuance. No public inbound access is required.
+mode = "cloudflare_acme"
+base_domain = "example.com"
+email = "you@example.com"
+cloudflare_token_file = "/run/secrets/cloudflare_token"
+renew_days_before = 30
+renew_check_seconds = 43200
+acme_server = "zerossl"
+
+[admin]
+password_hash = "pbkdf2_sha256$600000$replace_me$replace_me"
+session_secret = "replace-with-at-least-24-random-characters"
+session_ttl_seconds = 86400

@@ -1,0 +1,47 @@
+from pathlib import Path
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+src_str = str(SRC)
+if src_str not in sys.path:
+    sys.path.insert(0, src_str)
+
+from roborock_local_server.security import hash_password
+
+
+def write_release_config(tmp_path: Path, *, broker_mode: str = "external", enable_topic_bridge: bool = False) -> Path:
+    cert_dir = tmp_path / "certs"
+    cert_dir.mkdir(parents=True, exist_ok=True)
+    (cert_dir / "fullchain.pem").write_text("test-cert\n", encoding="utf-8")
+    (cert_dir / "privkey.pem").write_text("test-key\n", encoding="utf-8")
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        f"""
+[network]
+stack_fqdn = "roborock.example.com"
+
+[broker]
+mode = "{broker_mode}"
+host = "127.0.0.1"
+port = 1883
+enable_topic_bridge = {"true" if enable_topic_bridge else "false"}
+
+[storage]
+data_dir = "data"
+
+[tls]
+mode = "provided"
+cert_file = "certs/fullchain.pem"
+key_file = "certs/privkey.pem"
+
+[admin]
+password_hash = "{hash_password("correct horse battery staple", iterations=10_000)}"
+session_secret = "abcdefghijklmnopqrstuvwxyz123456"
+session_ttl_seconds = 3600
+        """.strip(),
+        encoding="utf-8",
+    )
+    return config_file

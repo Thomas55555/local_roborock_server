@@ -2,7 +2,7 @@
 
 You can follow this guide whenever you setup a vacuum. If it is a new vacuum, I'd recommend first setting it up on the Roborock app with the official servers and then go through the onboarding here. That way you can be sure your app has installed all of the artifacts it needs for that vacuum and you can check that it is up to date on it's firmware.
 
-1. You need to go through this cycle 2-4 times. I recommend having the admin dashboard up (https://api-roborock.example.com)
+1. You need to go through this cycle 2-4 times. I recommend having the admin dashboard up (https://api-roborock.example.com/admin)
 
 2. On a machine that is NOT running the server, you need to run the onboarding script found in this repo. 
 

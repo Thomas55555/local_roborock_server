@@ -550,6 +550,7 @@ class _RoutineMqttClient:
         step_deadline = loop.time() + _STEP_COMPLETE_TIMEOUT_SECONDS
         start_deadline = loop.time() + _STEP_START_TIMEOUT_SECONDS
         saw_activity = False
+        saw_cleaning = False
 
         try:
             while True:
@@ -569,14 +570,23 @@ class _RoutineMqttClient:
                     )
                     last_observed = observed
 
+                if in_cleaning != RoborockInCleaning.complete.value:
+                    saw_cleaning = True
+
                 is_ready = (
                     in_cleaning == RoborockInCleaning.complete.value
                     and state in _ROUTINE_READY_STATES
                 )
                 if not is_ready:
                     saw_activity = True
-                elif saw_activity:
+                elif saw_cleaning:
                     return
+                elif saw_activity:
+                    self._logger.info(
+                        "Routine wait: dock activity cycle ended (no cleaning observed), resetting"
+                    )
+                    saw_activity = False
+                    start_deadline = loop.time() + _STEP_START_TIMEOUT_SECONDS
 
                 if not saw_activity and loop.time() >= start_deadline:
                     raise RoutineExecutionError(

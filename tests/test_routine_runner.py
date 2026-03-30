@@ -3,6 +3,9 @@ import json
 import logging
 from pathlib import Path
 
+import pytest
+
+from roborock.data import StatusV2
 from roborock_local_server.bundled_backend.shared.context import ServerContext
 import roborock_local_server.bundled_backend.shared.routine_runner as routine_runner_module
 from roborock_local_server.bundled_backend.shared.routine_runner import RoutineRunner, parse_scene_steps
@@ -257,5 +260,111 @@ def test_run_scene_syncs_scene_tids_before_step_commands(tmp_path: Path, monkeyp
             RoborockCommand.APP_ZONED_CLEAN,
             [{"zones": [{"zid": 8, "repeat": 1}], "repeat": 1}],
         )
+
+    asyncio.run(exercise())
+
+
+# ---------------------------------------------------------------------------
+# wait_for_step_complete tests
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedStatusClient:
+    """Minimal stand-in for _RoutineMqttClient that replays a status sequence."""
+
+    def __init__(self, status_sequence: list[dict]) -> None:
+        self._statuses = [StatusV2.from_dict(s) for s in status_sequence]
+        self._index = 0
+        self._logger = logging.getLogger("test-wait")
+
+    async def get_status(self) -> StatusV2:
+        if self._index < len(self._statuses):
+            status = self._statuses[self._index]
+            self._index += 1
+            return status
+        return self._statuses[-1]
+
+
+_ScriptedStatusClient.wait_for_step_complete = (
+    routine_runner_module._RoutineMqttClient.wait_for_step_complete
+)
+
+
+def test_wait_for_step_complete_dock_activity_does_not_end_step(monkeypatch) -> None:
+    """Dock activity (emptying bin) followed by ready must not declare step complete."""
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_TIMEOUT_SECONDS", 0.1)
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_POLL_INTERVAL_SECONDS", 0.0)
+    monkeypatch.setattr(routine_runner_module, "_STATUS_POLL_INTERVAL_SECONDS", 0.0)
+
+    async def exercise() -> None:
+        client = _ScriptedStatusClient([
+            {"state": 22, "in_cleaning": 0},  # emptying bin
+            {"state": 15, "in_cleaning": 0},  # docking
+            {"state": 8, "in_cleaning": 0},   # charging — should NOT end step
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+        ])
+        with pytest.raises(routine_runner_module.RoutineExecutionError, match="did not leave ready state"):
+            await client.wait_for_step_complete()
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_step_complete_actual_cleaning_completes(monkeypatch) -> None:
+    """Step completes when in_cleaning becomes non-zero then robot returns to ready."""
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_POLL_INTERVAL_SECONDS", 0.0)
+    monkeypatch.setattr(routine_runner_module, "_STATUS_POLL_INTERVAL_SECONDS", 0.0)
+
+    async def exercise() -> None:
+        client = _ScriptedStatusClient([
+            {"state": 18, "in_cleaning": 3},  # segment cleaning
+            {"state": 18, "in_cleaning": 3},
+            {"state": 6, "in_cleaning": 3},   # returning home
+            {"state": 8, "in_cleaning": 0},   # charging — step complete
+        ])
+        await client.wait_for_step_complete()
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_step_complete_dock_then_cleaning_completes(monkeypatch) -> None:
+    """Dock activity followed by actual cleaning should complete after cleaning finishes."""
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_POLL_INTERVAL_SECONDS", 0.0)
+    monkeypatch.setattr(routine_runner_module, "_STATUS_POLL_INTERVAL_SECONDS", 0.0)
+
+    async def exercise() -> None:
+        client = _ScriptedStatusClient([
+            {"state": 22, "in_cleaning": 0},  # emptying bin
+            {"state": 15, "in_cleaning": 0},  # docking
+            {"state": 8, "in_cleaning": 0},   # charging — dock cycle ends, reset
+            {"state": 18, "in_cleaning": 3},  # actual cleaning starts
+            {"state": 18, "in_cleaning": 3},
+            {"state": 6, "in_cleaning": 3},   # returning home
+            {"state": 8, "in_cleaning": 0},   # step complete
+        ])
+        await client.wait_for_step_complete()
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_step_complete_start_timeout(monkeypatch) -> None:
+    """Raises RoutineExecutionError when robot stays in ready state past start deadline."""
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_TIMEOUT_SECONDS", 0.1)
+    monkeypatch.setattr(routine_runner_module, "_STEP_START_POLL_INTERVAL_SECONDS", 0.0)
+
+    async def exercise() -> None:
+        client = _ScriptedStatusClient([
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+            {"state": 8, "in_cleaning": 0},
+        ])
+        with pytest.raises(routine_runner_module.RoutineExecutionError, match="did not leave ready state"):
+            await client.wait_for_step_complete()
 
     asyncio.run(exercise())

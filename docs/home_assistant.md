@@ -1,13 +1,18 @@
 # Home Assistant
 
-To use this server with Home Assistant, you need to edit your config entry. You can find this in: `config/.storage/core.config_entries`
+Use this after [Installation](installation.md) and [Onboarding](onboarding.md) if you want Home Assistant to talk to your local stack.
 
-Ctrl-F and find "roborock.com".
+To use this server with Home Assistant, edit your config entry at `config/.storage/core.config_entries`.
 
-Replace base_url to: `https://api-roborock.example.com`
+Find `"roborock.com"` and replace the endpoint values with your local stack URLs:
 
-Replace "a" with `https://api-roborock.example.com`
+- `base_url` -> `https://api-roborock.example.com`
+- `"a"` -> `https://api-roborock.example.com`
+- `"l"` -> `https://api-roborock.example.com`
+- `"m"` -> `ssl://mqtt-roborock.example.com:8883`
 
-replace "l" with `https://api-roborock.example.com`
+## Related Docs
 
-replace "m" with `ssl://mqtt-roborock.example.com:8883`
+- [Installation](installation.md)
+- [Onboarding](onboarding.md)
+- [Using the Roborock App](roborock_app.md)

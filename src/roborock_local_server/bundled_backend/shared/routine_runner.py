@@ -51,6 +51,8 @@ _STEP_COMPLETE_TIMEOUT_SECONDS = 4 * 60 * 60
 _STEP_START_POLL_INTERVAL_SECONDS = 0.5
 _STATUS_POLL_INTERVAL_SECONDS = 5.0
 _ROUTINE_READY_STATES = {3, 8, 100}
+_POST_STEP_SETTLE_SECONDS = 15.0
+_POST_STEP_SETTLE_TIMEOUT_SECONDS = 10 * 60
 _WEB_API_INVENTORY_FILE = "web_api_inventory.json"
 _SUPPORTED_METHODS = {
     "do_scenes_app_start",
@@ -602,6 +604,62 @@ class _RoutineMqttClient:
             ) from exc
 
 
+    async def wait_for_dock_settle(self) -> None:
+        """Wait for automatic dock activities (e.g. bin emptying) to finish
+        before sending the next step.
+
+        After a cleaning step completes the robot may start dock maintenance
+        (state 22 = emptying bin, state 15 = docking, etc.).  If we send the
+        next cleaning command immediately the robot can ACK it but then let the
+        dock activity preempt it, effectively dropping the command.
+
+        Strategy: sleep a short grace period, then poll.  If the robot is busy,
+        keep polling until it is ready again (with a timeout).
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _POST_STEP_SETTLE_TIMEOUT_SECONDS
+
+        self._logger.info(
+            "Post-step settle: waiting %.0fs before checking dock activity",
+            _POST_STEP_SETTLE_SECONDS,
+        )
+        await asyncio.sleep(_POST_STEP_SETTLE_SECONDS)
+
+        last_observed = None
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                self._logger.warning(
+                    "Post-step settle: timed out after %.0fs waiting for dock activity to finish",
+                    _POST_STEP_SETTLE_TIMEOUT_SECONDS,
+                )
+                break
+
+            status = await asyncio.wait_for(self.get_status(), timeout=remaining)
+            state = _enum_or_int_value(status.state)
+            in_cleaning = _enum_or_int_value(status.in_cleaning)
+            observed = (state, in_cleaning)
+
+            is_ready = (
+                in_cleaning == RoborockInCleaning.complete.value
+                and state in _ROUTINE_READY_STATES
+            )
+
+            if is_ready:
+                self._logger.info("Post-step settle: robot is ready")
+                return
+
+            if observed != last_observed:
+                self._logger.info(
+                    "Post-step settle: robot busy state=%s in_cleaning=%s, waiting",
+                    state,
+                    in_cleaning,
+                )
+                last_observed = observed
+
+            await asyncio.sleep(_STATUS_POLL_INTERVAL_SECONDS)
+
+
 class RoutineRunner:
     def __init__(self, context: ServerContext) -> None:
         self._context = context
@@ -820,7 +878,7 @@ class RoutineRunner:
         await client.connect()
         try:
             await self._sync_scene_tids(client=client, scene=scene, device_id=device_id, logger=logger)
-            for step in steps:
+            for step_index, step in enumerate(steps):
                 commands = commands_for_step(step)
                 waits_for_step_complete = RoborockDataProtocol.TASK_COMPLETE.value in step.finish_dp_ids
                 for routine_command in commands:
@@ -846,6 +904,8 @@ class RoutineRunner:
                 if waits_for_step_complete:
                     logger.info("Waiting for ready state step=%s scene=%s", step.step_id, _scene_name(scene))
                     await client.wait_for_step_complete()
+                    if step_index < len(steps) - 1:
+                        await client.wait_for_dock_settle()
         finally:
             await client.close()
 

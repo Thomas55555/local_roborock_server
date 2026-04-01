@@ -5,3 +5,11 @@ theme:
 
 nav:
   - Home: index.md
+  - Installation: installation.md
+  - Cloudflare setup: cloudflare_setup.md
+  - Onboarding: onboarding.md
+  - Home Assistant: home_assistant.md
+  - Using the Roborock App: roborock_app.md
+  - Tested Vacuums: tested_vacuums.md
+  - Custom MQTT: custom_mqtt.md
+  - Custom certificate management: custom_cert_management.md

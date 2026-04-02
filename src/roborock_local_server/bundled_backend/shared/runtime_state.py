@@ -450,14 +450,13 @@ class RuntimeState:
     def _vacuum_effectively_connected_locked(vac: dict[str, Any] | None) -> bool:
         if vac is None:
             return False
-        if bool(vac.get("connected")):
-            return True
         last_mqtt_at = str(vac.get("last_mqtt_at") or "")
         if not last_mqtt_at:
-            return False
+            # No MQTT message ever received; trust the connection flag.
+            return bool(vac.get("connected"))
         parsed = _parse_iso(last_mqtt_at)
         if parsed is None:
-            return False
+            return bool(vac.get("connected"))
         delta = datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)
         return delta.total_seconds() <= 180
 

@@ -2,6 +2,11 @@
 
 Check this page alongside [Installation](installation.md) and [Onboarding](onboarding.md) if you are trying to confirm whether your model is expected to work.
 
+## Buying a New Vacuum?
+
+If you're looking to buy a Roborock, consider using one of my affiliate links on the [Support This Project](support.md) page. It doesn't cost you anything extra and helps keep this project going!
+
+
 ## Supported Vacuums
 
 The following vacuums are confirmed working:

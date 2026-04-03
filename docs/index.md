@@ -8,6 +8,10 @@ Use this page as the main docs hub for setup, onboarding, and follow-up guides.
 2. [Cloudflare setup](cloudflare_setup.md) if you want Cloudflare DNS-01 auto-renew for certificates.
 3. [Onboarding](onboarding.md) to pair a vacuum from a second machine after the server is running.
 
+## Support This Project
+
+If you want to support this project, next time you buy a Roborock, use one of my links that can be found on the [Support This Project](support.md) page!
+
 ## Integrations And Reference
 
 - [Home Assistant](home_assistant.md)

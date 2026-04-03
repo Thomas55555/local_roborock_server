@@ -15,3 +15,4 @@ Use this page as the main docs hub for setup, onboarding, and follow-up guides.
 - [Tested vacuums](tested_vacuums.md)
 - [Custom MQTT](custom_mqtt.md)
 - [Custom certificate management](custom_cert_management.md)
+- [Technical Writeup](technical_writeup.md)

@@ -41,6 +41,16 @@ def test_release_supervisor_start_stop_external_mode(tmp_path: Path, monkeypatch
 
     monkeypatch.setattr(ReleaseSupervisor, "_start_http_server", fake_start_http_server)
     monkeypatch.setattr(ReleaseSupervisor, "_start_mqtt_proxy", fake_start_mqtt_proxy)
+    zc_calls = {"start": 0, "stop": 0}
+
+    async def fake_zeroconf_start(self) -> None:  # type: ignore[no-untyped-def]
+        zc_calls["start"] += 1
+
+    async def fake_zeroconf_stop(self) -> None:  # type: ignore[no-untyped-def]
+        zc_calls["stop"] += 1
+
+    monkeypatch.setattr(server_module.ZeroconfAnnouncements, "start", fake_zeroconf_start)
+    monkeypatch.setattr(server_module.ZeroconfAnnouncements, "stop", fake_zeroconf_stop)
 
     asyncio.run(supervisor.start())
     health = supervisor.runtime_state.health_snapshot()
@@ -48,6 +58,7 @@ def test_release_supervisor_start_stop_external_mode(tmp_path: Path, monkeypatch
     assert service_map["https_server"]["running"] is True
     assert service_map["mqtt_tls_proxy"]["running"] is True
     assert service_map["mqtt_backend_broker"]["running"] is True
+    assert zc_calls["start"] == 1
 
     asyncio.run(supervisor.stop())
     health = supervisor.runtime_state.health_snapshot()
@@ -55,3 +66,4 @@ def test_release_supervisor_start_stop_external_mode(tmp_path: Path, monkeypatch
     assert service_map["https_server"]["running"] is False
     assert service_map["mqtt_tls_proxy"]["running"] is False
     assert service_map["mqtt_backend_broker"]["running"] is False
+    assert zc_calls["stop"] == 1

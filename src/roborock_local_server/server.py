@@ -26,6 +26,7 @@ from .bundled_backend.shared.runtime_state import ONBOARDING_STEP_LABELS, REQUIR
 from .cloud import CloudImportManager
 from .config import AppConfig, AppPaths, load_config, resolve_paths
 from .standalone_admin import register_standalone_admin_routes
+from .zeroconf import ZeroconfAnnouncements
 from .backend import (
     MqttTlsProxy,
     MqttTopicBridge,
@@ -256,6 +257,7 @@ class ReleaseSupervisor:
         self._mqtt_proxy: MqttTlsProxy | None = None
         self._http_server: ManagedFastApiServer | None = None
         self._renew_task: asyncio.Task[None] | None = None
+        self._zeroconf: ZeroconfAnnouncements | None = None
         self._stop_event = asyncio.Event()
 
         self.certificate_manager = CertificateManager(config=config, paths=paths)
@@ -350,6 +352,13 @@ class ReleaseSupervisor:
         )
         self.endpoint_rules = default_endpoint_rules()
         self.app = self._create_app()
+        self._zeroconf = ZeroconfAnnouncements(
+            stack_fqdn=self.config.network.stack_fqdn,
+            bind_host=self.config.network.bind_host,
+            https_port=self.config.network.https_port,
+            mqtt_tls_port=self.config.network.mqtt_tls_port,
+            region=self.config.network.region,
+        )
 
     def _init_zone_ranges_store(self) -> ZoneRangesStore:
         store = ZoneRangesStore(self.paths.http_jsonl_path.parent)
@@ -820,6 +829,8 @@ class ReleaseSupervisor:
             self._mqtt_proxy = None
         await self._start_http_server()
         self._start_mqtt_proxy()
+        if self._zeroconf is not None:
+            await self._zeroconf.restart()
 
     async def _renew_loop(self) -> None:
         interval = max(3600, self.config.tls.renew_check_seconds)
@@ -865,6 +876,8 @@ class ReleaseSupervisor:
 
         await self._start_http_server()
         self._start_mqtt_proxy()
+        if self._zeroconf is not None:
+            await self._zeroconf.start()
 
         self.root_logger.info(
             "HTTPS server listening on %s:%d",
@@ -911,6 +924,8 @@ class ReleaseSupervisor:
             self.runtime_state.set_service("https_server", running=False, required=True, enabled=True)
             await self._http_server.stop()
             self._http_server = None
+        if self._zeroconf is not None:
+            await self._zeroconf.stop()
         self.runtime_state.set_service("mqtt_backend_broker", running=False, required=True, enabled=True)
         if self._broker is not None:
             await self._broker.shutdown()

@@ -597,8 +597,8 @@ def test_wait_for_step_complete_requires_stable_non_cleaning_state(monkeypatch) 
     async def exercise() -> None:
         client = _ScriptedStatusClient([
             {"state": 18, "in_cleaning": 3},
-            {"state": 8, "in_cleaning": 0},
-            {"state": 18, "in_cleaning": 3},
+            {"state": 8, "in_cleaning": 0},   # transient non-cleaning state
+            {"state": 18, "in_cleaning": 3},  # cleaning resumes, so step is not done
             {"state": 18, "in_cleaning": 3},
             {"state": 8, "in_cleaning": 0},
             {"state": 8, "in_cleaning": 0},

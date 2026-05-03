@@ -14,7 +14,7 @@ def _answers(
     tls_mode: str = "cloudflare_acme",
 ) -> ConfigureAnswers:
     return ConfigureAnswers(
-        stack_fqdn="roborock.example.com",
+        stack_fqdn="api-roborock.example.com",
         https_port=https_port,
         mqtt_tls_port=mqtt_tls_port,
         broker_mode=broker_mode,
@@ -40,7 +40,7 @@ def test_write_config_setup_embedded_cloudflare(tmp_path: Path) -> None:
     assert not result.broker_template_needs_edit
 
     config = load_config(result.config_file)
-    assert config.network.stack_fqdn == "roborock.example.com"
+    assert config.network.stack_fqdn == "api-roborock.example.com"
     assert config.network.https_port == 555
     assert config.network.mqtt_tls_port == 8881
     assert config.broker.mode == "embedded"

@@ -65,7 +65,7 @@ def _toml_string(value: str) -> str:
     return json.dumps(value)
 
 
-def _normalize_hostname(raw_value: str, *, field_name: str) -> str:
+def _normalize_hostname(raw_value: str, *, field_name: str, require_api_prefix: bool = False) -> str:
     text = str(raw_value or "").strip()
     if not text:
         raise ValueError(f"{field_name} is required")
@@ -85,6 +85,8 @@ def _normalize_hostname(raw_value: str, *, field_name: str) -> str:
         raise ValueError(f"{field_name} must be a hostname without a scheme or path")
     if "." not in normalized:
         raise ValueError(f"{field_name} must be a fully qualified domain name")
+    if require_api_prefix and not normalized.startswith("api-"):
+        raise ValueError(f"{field_name} must start with api-")
     return normalized
 
 
@@ -100,7 +102,11 @@ def _prompt_hostname(prompt: str, *, field_name: str) -> str:
     while True:
         raw_value = _prompt_non_empty(prompt)
         try:
-            return _normalize_hostname(raw_value, field_name=field_name)
+            return _normalize_hostname(
+                raw_value,
+                field_name=field_name,
+                require_api_prefix=field_name == "stack_fqdn",
+            )
         except ValueError as exc:
             print(exc)
 
@@ -177,8 +183,8 @@ def collect_configure_answers() -> ConfigureAnswers:
         "Stack FQDN (hostname only (no 'https://'); it needs to start with api-): ",
         field_name="stack_fqdn",
     )
-    https_port = _prompt_port("HTTPS port to advertise and listen on", default=555)
-    mqtt_tls_port = _prompt_port("MQTT TLS port to advertise and listen on", default=8881)
+    https_port = _prompt_port("Advertised HTTPS port", default=555)
+    mqtt_tls_port = _prompt_port("Advertised MQTT TLS port", default=8881)
     use_external_broker = _prompt_yes_no("Use your own MQTT broker instead of the embedded one?", default=False)
     use_cloudflare_acme = _prompt_yes_no("Use Cloudflare DNS-01 for automatic TLS renewal?", default=True)
 

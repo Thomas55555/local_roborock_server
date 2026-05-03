@@ -243,6 +243,7 @@ def test_admin_login_and_status_flow(tmp_path: Path) -> None:
     assert dashboard_page.status_code == 200
     assert "Cloud Import" in dashboard_page.text
     assert "Protocol Auth" in dashboard_page.text
+    assert "Protocol Sync Secret" in dashboard_page.text
 
     assert "Num query samples" in dashboard_page.text
     assert "Public Key determined" in dashboard_page.text
@@ -282,6 +283,7 @@ def test_admin_auth_endpoints_toggle_protocol_auth_and_manage_sessions(tmp_path:
     assert auth_payload.status_code == 200
     auth_json = auth_payload.json()
     assert auth_json["protocol_auth_enabled"] is True
+    assert auth_json["admin_session_secret"] == config.admin.session_secret
     assert auth_json["protocol_session_count"] >= 1
     session = next(item for item in auth_json["protocol_sessions"] if item["hawk_id"] == issued["rriot"]["u"])
 
@@ -884,7 +886,88 @@ def test_post_scene_create_accepts_hawk_json_body_signature(tmp_path: Path) -> N
     stored_inventory = json.loads(paths.inventory_path.read_text(encoding="utf-8"))
     assert any(scene["name"] == "Party prep" for scene in stored_inventory["scenes"])
 
+def test_shared_device_query_routes_return_rooms_and_received_devices(tmp_path: Path) -> None:
+    config_file = write_release_config(tmp_path)
+    config = load_config(config_file)
+    paths = resolve_paths(config_file, config)
+    device_id = "6HL2zfniaoYYV01CkVuhkO"
 
+    paths.inventory_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.inventory_path.write_text(
+        json.dumps(
+            {
+                "home": {
+                    "id": 1316433,
+                    "name": "My Home",
+                    "rooms": [
+                        {"id": 10283928, "name": "Kitchen"},
+                        {"id": 10283924, "name": "Living room"},
+                    ],
+                },
+                "received_devices": [
+                    {
+                        "duid": device_id,
+                        "name": "Roborock Qrevo MaxV 2",
+                        "model": "roborock.vacuum.a87",
+                        "product_id": "5gUei3OIJIXVD3eD85Balg",
+                        "local_key": "xPd5Dr8CGGqtdDlH",
+                        "online": True,
+                        "pv": "1.0",
+                        "share": True,
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _seed_protocol_snapshot(paths.cloud_snapshot_path)
+    cloud_snapshot = json.loads(paths.cloud_snapshot_path.read_text(encoding="utf-8"))
+    cloud_snapshot.update(
+        {
+            "id": 1316433,
+            "name": "My Home",
+            "receivedDevices": [
+                {
+                    "duid": device_id,
+                    "name": "Roborock Qrevo MaxV 2",
+                    "productId": "5gUei3OIJIXVD3eD85Balg",
+                    "share": True,
+                }
+            ],
+            "products": [
+                {
+                    "id": "5gUei3OIJIXVD3eD85Balg",
+                    "name": "Roborock Qrevo MaxV",
+                    "model": "roborock.vacuum.a87",
+                    "category": "robot.vacuum.cleaner",
+                }
+            ],
+        }
+    )
+    paths.cloud_snapshot_path.write_text(json.dumps(cloud_snapshot) + "\n", encoding="utf-8")
+
+    supervisor = ReleaseSupervisor(config=config, paths=paths)
+    client = TestClient(supervisor.app)
+
+    received_devices_response = client.get(
+        "/user/deviceshare/query/receiveddevices",
+        headers=_hawk_headers(paths.cloud_snapshot_path, "/user/deviceshare/query/receiveddevices"),
+    )
+    assert received_devices_response.status_code == 200
+    received_devices = received_devices_response.json()["data"]
+    assert len(received_devices) == 1
+    assert received_devices[0]["duid"] == device_id
+
+    rooms_response = client.get(
+        f"/user/deviceshare/query/{device_id}/rooms",
+        headers=_hawk_headers(paths.cloud_snapshot_path, f"/user/deviceshare/query/{device_id}/rooms"),
+    )
+    assert rooms_response.status_code == 200
+    assert rooms_response.json()["data"] == [
+        {"id": 10283928, "name": "Kitchen"},
+        {"id": 10283924, "name": "Living room"},
+    ]
 def test_execute_scene_hydrates_missing_zone_ranges_from_mqtt(tmp_path: Path) -> None:
     config_file = write_release_config(tmp_path)
     config = load_config(config_file)

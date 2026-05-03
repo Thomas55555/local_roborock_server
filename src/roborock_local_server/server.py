@@ -49,6 +49,8 @@ from shared.protocol_auth import ProtocolAuthStore
 from https_server.routes.auth.service import (
     build_login_data_response,
     cloud_login_data_required_response,
+    load_cloud_full_snapshot,
+    with_current_server_urls,
 )
 from .bundled_backend.shared.zone_ranges_store import ZoneRangesStore
 from .security import AdminSessionManager, verify_password
@@ -173,28 +175,36 @@ class ManagedFastApiServer:
         app: FastAPI,
         bind_host: str,
         port: int,
-        cert_file: Path,
-        key_file: Path,
+        tls_enabled: bool,
+        cert_file: Path | None = None,
+        key_file: Path | None = None,
     ) -> None:
         self._app = app
         self._bind_host = bind_host
         self._port = port
+        self._tls_enabled = tls_enabled
         self._cert_file = cert_file
         self._key_file = key_file
         self._server: uvicorn.Server | None = None
         self._serve_task: asyncio.Task[bool] | None = None
 
     async def start(self) -> None:
-        config = uvicorn.Config(
-            app=self._app,
-            host=self._bind_host,
-            port=self._port,
-            log_level="warning",
-            access_log=False,
-            ssl_certfile=str(self._cert_file),
-            ssl_keyfile=str(self._key_file),
-            ssl_ciphers="DEFAULT:@SECLEVEL=0",
-        )
+        config_kwargs: dict[str, Any] = {
+            "app": self._app,
+            "host": self._bind_host,
+            "port": self._port,
+            "log_level": "warning",
+            "access_log": False,
+        }
+        if self._tls_enabled:
+            if self._cert_file is None or self._key_file is None:
+                raise RuntimeError("TLS-enabled HTTP server requires cert_file and key_file")
+            config_kwargs.update(
+                ssl_certfile=str(self._cert_file),
+                ssl_keyfile=str(self._key_file),
+                ssl_ciphers="DEFAULT:@SECLEVEL=0",
+            )
+        config = uvicorn.Config(**config_kwargs)
         self._server = uvicorn.Server(config)
         self._serve_task = asyncio.create_task(self._server.serve(), name="release-https-server")
         await self._wait_started()
@@ -350,14 +360,14 @@ class ReleaseSupervisor:
             running=False,
             required=True,
             enabled=True,
-            detail=f"{self.config.network.bind_host}:{self.config.network.https_port}",
+            detail=f"tls:{self.config.network.bind_host}:{self.config.network.https_port}",
         )
         self.runtime_state.set_service(
             "mqtt_tls_proxy",
             running=False,
             required=True,
             enabled=True,
-            detail=f"{self.config.network.bind_host}:{self.config.network.mqtt_tls_port}",
+            detail=f"tls:{self.config.network.bind_host}:{self.config.network.mqtt_tls_port}",
         )
         self.runtime_state.set_service(
             "mqtt_backend_broker",
@@ -529,6 +539,25 @@ class ReleaseSupervisor:
                 }
             },
         }
+
+    def _protocol_login_identity(self) -> dict[str, Any]:
+        snapshot = load_cloud_full_snapshot(self.context)
+        if isinstance(snapshot, dict):
+            meta_value = snapshot.get("meta")
+            meta = meta_value if isinstance(meta_value, dict) else {}
+            user_data_value = snapshot.get("user_data")
+            candidate_user_data = user_data_value if isinstance(user_data_value, dict) else {}
+            candidate_accounts = (
+                meta.get("username"),
+                candidate_user_data.get("email"),
+                candidate_user_data.get("username"),
+                candidate_user_data.get("account"),
+            )
+            if any(self._protocol_login_email_matches(str(candidate or "")) for candidate in candidate_accounts):
+                patched_user_data = with_current_server_urls(self.context, candidate_user_data)
+                if str(patched_user_data.get("rruid") or "").strip():
+                    return patched_user_data
+        return self._local_protocol_identity()
 
     @staticmethod
     def _normalized_path(path: str) -> str:
@@ -802,7 +831,7 @@ class ReleaseSupervisor:
                 return "protocol_login_submit_code", status_code, payload
             try:
                 issued_user_data = self.protocol_auth.issue_local_session(
-                    self._local_protocol_identity(),
+                    self._protocol_login_identity(),
                     source="protocol_code_login",
                 )
             except ValueError as exc:
@@ -1275,6 +1304,7 @@ class ReleaseSupervisor:
         ]
         return {
             "protocol_auth_enabled": self.protocol_auth_enabled(),
+            "admin_session_secret": self.config.admin.session_secret,
             "protocol_sessions": sessions,
             "protocol_session_count": len(sessions),
             "pending_device_mqtt_recovery": self._pending_device_mqtt_recovery_payload(),
@@ -1448,6 +1478,7 @@ class ReleaseSupervisor:
             app=self.app,
             bind_host=self.config.network.bind_host,
             port=self.config.network.https_port,
+            tls_enabled=True,
             cert_file=cert_paths.cert_file,
             key_file=cert_paths.key_file,
         )
@@ -1472,6 +1503,7 @@ class ReleaseSupervisor:
             runtime_state=self.runtime_state,
             runtime_credentials=self.runtime_credentials,
             zone_ranges_store=self.context.zone_ranges_store,
+            tls_enabled=True,
         )
         self._mqtt_proxy.start()
         self.runtime_state.set_service("mqtt_tls_proxy", running=True, required=True, enabled=True)

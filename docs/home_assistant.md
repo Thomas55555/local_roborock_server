@@ -29,7 +29,7 @@ This is an installation method, not a post-install integration step. The add-on 
    - `protocol_login_email`
    - `protocol_login_pin`
    - TLS settings:
-     - `tls_mode = provided` with `cert_file` and `key_file`
+     - `tls_mode = provided` with explicit `cert_file` and `key_file`
      - or `tls_mode = cloudflare_acme` with `tls_base_domain`, `tls_email`, and `cloudflare_token`
 
 5. Start the add-on.

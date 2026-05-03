@@ -59,7 +59,7 @@ def test_write_config_from_home_assistant_options_provided_tls(tmp_path: Path) -
     assert token_path.exists() is False
 
 
-def test_write_config_from_home_assistant_options_provided_tls_uses_default_paths_when_blank(tmp_path: Path) -> None:
+def test_write_config_from_home_assistant_options_provided_tls_requires_paths_when_blank(tmp_path: Path) -> None:
     options_path = tmp_path / "options.json"
     config_path = tmp_path / "config.toml"
 
@@ -76,15 +76,11 @@ def test_write_config_from_home_assistant_options_provided_tls_uses_default_path
         },
     )
 
-    write_config_from_home_assistant_options(
-        options_path=options_path,
-        config_path=config_path,
-    )
-
-    parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    assert parsed["tls"]["mode"] == "provided"
-    assert parsed["tls"]["cert_file"] == "/ssl/fullchain.pem"
-    assert parsed["tls"]["key_file"] == "/ssl/privkey.pem"
+    with pytest.raises(ValueError, match="cert_file is required"):
+        write_config_from_home_assistant_options(
+            options_path=options_path,
+            config_path=config_path,
+        )
 
 
 def test_write_config_from_home_assistant_options_ignores_legacy_protocol_auth_toggle(tmp_path: Path) -> None:
@@ -95,6 +91,8 @@ def test_write_config_from_home_assistant_options_ignores_legacy_protocol_auth_t
         options_path,
         {
             "stack_fqdn": "api-roborock.example.com",
+            "cert_file": "/ssl/fullchain.pem",
+            "key_file": "/ssl/privkey.pem",
             "admin_password": "secret",
             "protocol_auth_enabled": False,
             "protocol_login_email": "user@example.com",
@@ -119,6 +117,8 @@ def test_write_config_from_home_assistant_options_reuses_existing_session_secret
         options_path,
         {
             "stack_fqdn": "api-roborock.example.com",
+            "cert_file": "/ssl/fullchain.pem",
+            "key_file": "/ssl/privkey.pem",
             "admin_password": "secret",
             "protocol_login_email": "user@example.com",
             "protocol_login_pin": "654321",
@@ -153,6 +153,8 @@ def test_write_config_from_home_assistant_options_ignores_legacy_broker_flags(tm
             "broker_host": "mqtt.internal",
             "broker_port": 1883,
             "enable_topic_bridge": False,
+            "cert_file": "/ssl/fullchain.pem",
+            "key_file": "/ssl/privkey.pem",
             "admin_password": "secret",
             "protocol_login_email": "user@example.com",
             "protocol_login_pin": "654321",
@@ -273,6 +275,8 @@ def test_write_config_from_home_assistant_options_requires_admin_password(tmp_pa
         options_path,
         {
             "stack_fqdn": "api-roborock.example.com",
+            "cert_file": "/ssl/fullchain.pem",
+            "key_file": "/ssl/privkey.pem",
             "protocol_login_email": "user@example.com",
             "protocol_login_pin": "123456",
         },
@@ -320,6 +324,8 @@ def test_write_config_from_home_assistant_options_removes_stale_cloudflare_token
         {
             "stack_fqdn": "api-roborock.example.com",
             "tls_mode": "provided",
+            "cert_file": "/ssl/fullchain.pem",
+            "key_file": "/ssl/privkey.pem",
             "admin_password": "secret",
             "protocol_login_email": "user@example.com",
             "protocol_login_pin": "654321",

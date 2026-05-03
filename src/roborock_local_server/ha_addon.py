@@ -13,11 +13,6 @@ from urllib.parse import urlsplit
 
 from .configure import hash_password
 
-
-DEFAULT_CERT_FILE = "/ssl/fullchain.pem"
-DEFAULT_KEY_FILE = "/ssl/privkey.pem"
-
-
 DEFAULT_OPTIONS: dict[str, Any] = {
     "stack_fqdn": "",
     "https_port": 555,
@@ -27,8 +22,8 @@ DEFAULT_OPTIONS: dict[str, Any] = {
     "tls_base_domain": "",
     "tls_email": "",
     "cloudflare_token": "",
-    "cert_file": DEFAULT_CERT_FILE,
-    "key_file": DEFAULT_KEY_FILE,
+    "cert_file": "",
+    "key_file": "",
     "admin_password": "",
     "protocol_login_email": "",
     "protocol_login_pin": "",
@@ -162,8 +157,8 @@ def _render_config_toml(
     tls_base_domain = str(merged.get("tls_base_domain", "") or "").strip()
     tls_email = str(merged.get("tls_email", "") or "").strip()
     cloudflare_token = str(merged.get("cloudflare_token", "") or "").strip()
-    cert_file = str(merged.get("cert_file", DEFAULT_CERT_FILE) or "").strip()
-    key_file = str(merged.get("key_file", DEFAULT_KEY_FILE) or "").strip()
+    cert_file = str(merged.get("cert_file", "") or "").strip()
+    key_file = str(merged.get("key_file", "") or "").strip()
     effective_tls_mode = "cloudflare_acme" if cloudflare_token else tls_mode
 
     if effective_tls_mode == "cloudflare_acme":
@@ -171,8 +166,6 @@ def _render_config_toml(
         _require_email(tls_email, field_name="tls_email")
         _require_non_empty(cloudflare_token, field_name="cloudflare_token")
     else:
-        cert_file = cert_file or DEFAULT_CERT_FILE
-        key_file = key_file or DEFAULT_KEY_FILE
         _require_non_empty(cert_file, field_name="cert_file")
         _require_non_empty(key_file, field_name="key_file")
 

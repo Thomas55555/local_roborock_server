@@ -12,7 +12,7 @@ It publishes two TLS ports directly:
 1. Set `stack_fqdn` to your `api-...` hostname.
 2. Set `admin_password`, `protocol_login_email`, and `protocol_login_pin` (6 digits).
 3. Choose TLS mode:
-   - `provided`: set `cert_file` and `key_file` (defaults: `/ssl/fullchain.pem`, `/ssl/privkey.pem`)
+   - `provided`: set `cert_file` and `key_file`
    - `cloudflare_acme`: set `tls_base_domain`, `tls_email`, `cloudflare_token`
 4. Start the add-on.
 

@@ -30,6 +30,8 @@ from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.PublicKey import RSA
 from Crypto.Util.Padding import pad
 
+from onboarding_shared import build_ssl_context, perform_onboarding_preflight
+
 
 CFGWIFI_HOST = "192.168.8.1"
 CFGWIFI_PORT = 55559
@@ -255,6 +257,7 @@ class GuidedOnboardingConfig:
     timezone: str
     cst: str
     country_domain: str
+    allow_insecure_tls: bool = False
 
 
 class ApiReachabilityError(RuntimeError):
@@ -312,6 +315,9 @@ class RemoteOnboardingApi:
 
     def delete_session(self, *, session_id: str) -> dict[str, Any]:
         return self._request_json("DELETE", f"/admin/api/onboarding/sessions/{parse.quote(session_id, safe='')}")
+
+    def get_status(self) -> dict[str, Any]:
+        return self._request_json("GET", "/admin/api/status")
 
     def _request_json(
         self,
@@ -374,6 +380,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timezone", default="")
     parser.add_argument("--cst", default="")
     parser.add_argument("--country-domain", default="")
+    parser.add_argument(
+        "--allow-insecure-tls",
+        action="store_true",
+        help="Skip TLS certificate verification for the admin API and MQTT preflight checks.",
+    )
     return parser
 
 
@@ -415,6 +426,7 @@ def prompt_for_config(args: argparse.Namespace) -> GuidedOnboardingConfig:
         timezone=timezone,
         cst=cst,
         country_domain=country_domain,
+        allow_insecure_tls=bool(args.allow_insecure_tls),
     )
 
 
@@ -652,11 +664,21 @@ def run_guided_onboarding(
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = prompt_for_config(args)
+    ssl_context = build_ssl_context(allow_insecure_tls=config.allow_insecure_tls)
     api = RemoteOnboardingApi(
         base_url=config.api_base_url,
         admin_password=config.admin_password,
+        ssl_context=ssl_context,
     )
     try:
+        if config.allow_insecure_tls:
+            print("TLS certificate verification is DISABLED. Preflight will only test reachability.")
+        perform_onboarding_preflight(
+            api=api,
+            api_base_url=config.api_base_url,
+            allow_insecure_tls=config.allow_insecure_tls,
+            output=sys.stdout,
+        )
         return run_guided_onboarding(config=config, api=api)
     except KeyboardInterrupt:
         print("\nInterrupted.")

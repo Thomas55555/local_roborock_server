@@ -467,7 +467,7 @@
                     <div id="cfg-err" class="callout err hidden"></div>
 
                     <div class="actions">
-                        <button class="btn primary" id="cfg-submit">Connect</button>
+                        <button class="btn primary" id="cfg-submit">Validate and connect</button>
                     </div>
                 </div>
             </section>
@@ -786,12 +786,12 @@
         } else if (state.phase === "logging_in") {
           showView("config");
           $("cfg-submit").disabled = true;
-          $("cfg-submit").textContent = "Connecting...";
+          $("cfg-submit").textContent = "Validating...";
           $("view-log").classList.remove("hidden");
 
         } else if (state.phase === "choosing_device") {
           $("cfg-submit").disabled = false;
-          $("cfg-submit").textContent = "Connect";
+          $("cfg-submit").textContent = "Validate and connect";
           renderDevices(state.devices || []);
           showView("devices");
           $("view-log").classList.remove("hidden");
@@ -806,7 +806,7 @@
           $("cfg-err").innerHTML = `<strong>Could not continue</strong><div class="sub">${escapeHtml(state.config_error)}</div>`;
           $("cfg-err").classList.remove("hidden");
           $("cfg-submit").disabled = false;
-          $("cfg-submit").textContent = "Connect";
+          $("cfg-submit").textContent = "Validate and connect";
         }
 
         lastPhase = state.phase;

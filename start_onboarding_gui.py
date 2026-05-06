@@ -40,6 +40,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 import uvicorn
 
+from onboarding_shared import build_ssl_context, perform_onboarding_preflight
+
 
 CFGWIFI_HOST = "192.168.8.1"
 CFGWIFI_PORT = 55559
@@ -315,6 +317,9 @@ class RemoteOnboardingApi:
 
     def delete_session(self, *, session_id: str) -> dict[str, Any]:
         return self._request_json("DELETE", f"/admin/api/onboarding/sessions/{parse.quote(session_id, safe='')}")
+
+    def get_status(self) -> dict[str, Any]:
+        return self._request_json("GET", "/admin/api/status")
 
     def _request_json(
             self,
@@ -852,10 +857,10 @@ def _worker_loop() -> None:
             continue
 
         _set_phase("logging_in", config=config, config_error=None)
-        _log.info(f"Logging in to {config.api_base_url}...")
+        _log.info(f"Validating {config.api_base_url}...")
         if config.allow_insecure_tls:
-            _log.warn("TLS certificate verification is DISABLED. Connection is not fully secure.")
-            _ssl_ctx: ssl.SSLContext | None = ssl._create_unverified_context()
+            _log.warn("TLS certificate verification is DISABLED. Preflight will only test reachability.")
+            _ssl_ctx: ssl.SSLContext | None = build_ssl_context(allow_insecure_tls=True)
         else:
             _ssl_ctx = None  # use default verification
         api = RemoteOnboardingApi(
@@ -865,13 +870,18 @@ def _worker_loop() -> None:
         )
 
         try:
-            api.login()
+            perform_onboarding_preflight(
+                api=api,
+                api_base_url=config.api_base_url,
+                allow_insecure_tls=config.allow_insecure_tls,
+                output=_log,
+            )
         except Exception as exc:  # noqa: BLE001
             _set_phase("needs_config", config_error=str(exc), config=None)
-            _log.err(f"Login failed: {exc}")
+            _log.err(f"Validation failed: {exc}")
             continue
 
-        _log.ok("Logged in.")
+        _log.ok("Validation succeeded.")
 
         try:
             _run_device_loop(api, config)

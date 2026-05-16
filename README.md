@@ -48,6 +48,7 @@ Before choosing a certificate path, check [Tested vacuums](docs/tested_vacuums.m
 Additional docs:
 
 - [Docs index](docs/index.md)
+- [Known limitations](docs/known_limitations.md)
 - [Tested vacuums](docs/tested_vacuums.md)
 - [Home Assistant](docs/home_assistant.md) for the add-on install path and Home Assistant integration rewiring
 - [Using the Roborock App](docs/roborock_app.md)
